@@ -54,9 +54,6 @@ public class SlteRIL extends RIL {
     private static final int RIL_UNSOL_AM = 11010;
     private static final int RIL_UNSOL_SIM_PB_READY = 11021;
 
-    private static final int RIL_UNSOL_WB_AMR_STATE = 20017;
-    private static final int RIL_UNSOL_SNDMGR_CLOCK_CTRL = 20022;
-
     private Message mPendingGetSimStatus;
 
     // Number of per-network elements expected in QUERY_AVAILABLE_NETWORKS's response.
@@ -241,6 +238,10 @@ public class SlteRIL extends RIL {
             dc.als = p.readInt();
             dc.isVoice = (0 != p.readInt());
 
+            int call_type = p.readInt();            // Samsung CallDetails
+            int call_domain = p.readInt();          // Samsung CallDetails
+            String csv = p.readString();            // Samsung CallDetails
+
             dc.isVoicePrivacy = (0 != p.readInt());
             dc.number = p.readString();
             if (RILJ_LOGV) {
@@ -268,12 +269,12 @@ public class SlteRIL extends RIL {
                         + new String(dc.uusInfo.getUserData()));
                 riljLogv("Incoming UUS : data (hex): "
                         + IccUtils.bytesToHexString(dc.uusInfo.getUserData()));
+
+                // Make sure there's a leading + on addresses with a TOA of 145
+                dc.number = PhoneNumberUtils.stringFromStringAndTOA(dc.number, dc.TOA);
             } else {
                 riljLogv("Incoming UUS : NOT present!");
             }
-
-            // Make sure there's a leading + on addresses with a TOA of 145
-            dc.number = PhoneNumberUtils.stringFromStringAndTOA(dc.number, dc.TOA);
 
             response.add(dc);
 
@@ -288,12 +289,12 @@ public class SlteRIL extends RIL {
 
         Collections.sort(response);
 
-        if ((num == 0) && mTestingEmergencyCall.getAndSet(false)) {
-            if (mEmergencyCallbackModeRegistrant != null) {
-                riljLog("responseCallList: call ended, testing emergency call," +
-                            " notify ECM Registrants");
-                mEmergencyCallbackModeRegistrant.notifyRegistrant();
-            }
+        if ((num == 0) &&
+            mTestingEmergencyCall.getAndSet(false) &&
+            (mEmergencyCallbackModeRegistrant != null)) {
+            riljLog("responseCallList: call ended, testing emergency call," +
+                        " notify ECM Registrants");
+            mEmergencyCallbackModeRegistrant.notifyRegistrant();
         }
 
         return response;
@@ -409,8 +410,6 @@ public class SlteRIL extends RIL {
         /* Remap incorrect respones or ignore them */
         switch (origResponse) {
             case RIL_UNSOL_STK_CALL_CONTROL_RESULT:
-            case RIL_UNSOL_WB_AMR_STATE: /* Wideband AMR callback */
-            case RIL_UNSOL_SNDMGR_CLOCK_CTRL: /* Wideband clock change */
             case RIL_UNSOL_DEVICE_READY_NOTI: /* Registrant notification */
             case RIL_UNSOL_SIM_PB_READY: /* Registrant notification */
                 Rlog.v(RILJ_LOG_TAG,

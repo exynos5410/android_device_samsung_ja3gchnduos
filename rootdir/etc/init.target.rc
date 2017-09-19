@@ -7,6 +7,26 @@ on init
     restorecon /dev/mbin1
 
 on post-fs-data
+# PMK permission
+    mkdir /efs/mc 0770 radio system
+    chown radio system /efs/mc
+    chmod 0770 /efs/mc
+    chown radio system /efs/mc/mc.dat
+    chmod 0640 /efs/mc/mc.dat
+
+# h2k permission
+    mkdir /efs/cpk 0771 radio system
+    chmod 0644 /efs/redata.bin
+    chmod 0644 /efs/cpk/redata.bin
+    chown radio radio /efs/h2k.dat
+    chown radio radio /efs/cpk/h2k.dat
+    chmod 0644 /efs/h2k.dat
+    chmod 0644 /efs/cpk/h2k.dat
+    chown system system /efs/drm/h2k
+
+    restorecon /dev/icd
+    restorecon /dev/icdr
+
     # SEAndroid Restore context for efs files
     restorecon -R /efs_gsm
 
@@ -32,30 +52,14 @@ service modemloader /system/bin/modemloader
     class core
     oneshot
 
-service cpboot-daemon /system/bin/cbd -d -txmm626 -bh -mh -p 13
+service cpboot-daemon /system/bin/cbd -d -txmm626x -bh -mh -p 13
     class main
     user root
     group radio cache inet misc audio sdcard_rw log sdcard_r shell
 
-service cpboot-daemon2 /system/bin/cbd -d -t esc6270 -b u -m p -p 22
-    class main
-    user root
-    group radio cache inet misc audio sdcard_rw log sdcard_r shell
-
-service ril-daemon /system/bin/rild -l /system/lib/libsec-ril-cdma.so
-    class main
-    socket rild stream 660 root radio
-    socket rild-debug stream 660 radio system
-    user root
-    group radio cache inet misc audio sdcard_r sdcard_rw diag log readproc wakelock
-    onrestart restart cpboot-daemon
-
-service ril-daemon2 /system/bin/rild -c 2
-    class main
-    socket rild2 stream 660 root radio
-    socket rild-debug2 stream 660 radio system
-    user root
-    group radio cache inet misc audio sdcard_rw qcom_oncrpc diag log readproc wakelock graphics
+on property:persist.sys.cpboot=disable
+    stop ril-daemon
+    stop cpboot-daemon
 
 # GPS
 service gpsd /system/bin/gpsd -c /system/etc/gps.xml
